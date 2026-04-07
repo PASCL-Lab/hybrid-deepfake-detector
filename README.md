@@ -1,16 +1,16 @@
 # Hybrid Deepfake Detection System
 
-A web-based deepfake detection system using a hybrid ensemble approach combining three AI models: SBI (Self-Blended Images), DistilDIRE, and ChatGPT Vision API.
+A web-based deepfake detection system combining three AI models — SBI (Self-Blended Images), DistilDIRE, and GPT-5.4 Vision — each targeting a distinct class of facial manipulation.
 
 ## Project Status
 
 ### Implemented
 - **Frontend**: React + Vite + Tailwind CSS (black & white minimalist design)
 - **Backend API**: FastAPI with `/api/v1/detect` endpoint
-- **ChatGPT Vision**: Fully functional deepfake detection using GPT-4o
+- **GPT-5.4 Vision**: Zero-shot deepfake detection using Pirogov's logprobs normalization method (ICML 2025)
 - **SBI Model**: EfficientNet-B4 fine-tuned on FFHQ + LFW + CelebA-HQ (AUC 98.73%)
 - **DistilDIRE Model**: ConvNeXt-base with CLIP-LAION2B pretraining (AP 96.11%)
-- **Ensemble Fusion**: Weighted combination with adaptive strategy based on active models
+- **Independent Model Verdicts**: Each model targets different manipulation types; no ensemble averaging
 - **Docker Deployment**: Full containerized deployment with docker-compose
 
 ### Model Availability
@@ -55,33 +55,34 @@ Models run in "placeholder" mode if weight files are not present. Download model
 
 | Model | Architecture | Input Size | Performance |
 |-------|-------------|------------|-------------|
-| **SBI** | EfficientNet-B4 | 380×380 | AUC 98.73%, Acc 94.83% |
-| **DistilDIRE v2** | ConvNeXt-base + CLIP | 224×224 | Acc 86.89%, AP 96.11% |
-| **ChatGPT Vision** | GPT-4o | Auto | VLM reasoning |
+| **SBI** | EfficientNet-B4 | 380×380 | AUC 98.73%, Acc 94.83% — targets face-swap & reenactment |
+| **DistilDIRE v2** | ConvNeXt-base + CLIP | 224×224 | Acc 86.89%, AP 96.11% — targets AI-synthesized images |
+| **GPT-5.4 Vision** | GPT-5.4 (VLM) | Auto-compressed | Zero-shot — targets general manipulation & artifacts |
 
-### Ensemble Fusion Strategy
+### Detection Strategy
 
-The system adapts based on available models:
+Each model runs independently and targets a different manipulation type. The image is flagged as fake if **any** model exceeds its per-model threshold:
 
-- **3 Models Active**: SBI (30%) + DistilDIRE (35%) + ChatGPT (35%)
-- **2 Models Active**: Weighted split based on model pair
-- **1 Model Active**: Single model at 100%
-
-Final decision threshold: confidence > 0.5 indicates deepfake
+- **SBI**: threshold 0.4839 (optimized for face-swap detection)
+- **DistilDIRE**: threshold 0.50 (optimized for AI-generated image detection)
+- **GPT-5.4 Vision**: threshold 0.65 — confidence derived from first-token logprobs normalization (Pirogov, ICML 2025): `P̃_fake = P(NO) / (P(NO) + P(YES))`
 
 ## Setup
 
-### Quick Start with Docker (Recommended)
+### Quick Start (Recommended)
 
 ```bash
-# Clone and configure
-git clone <repo-url>
-cd hybrid-deepfake-detector
-
 # Set your OpenAI API key
 echo "OPENAI_API_KEY=your_key_here" > backend/.env
 
-# Build and run
+# Start both frontend and backend
+./start.sh
+```
+
+### Docker
+
+```bash
+echo "OPENAI_API_KEY=your_key_here" > backend/.env
 docker-compose up -d --build
 ```
 
@@ -142,22 +143,20 @@ Frontend runs at: http://localhost:3000
 ```json
 {
   "is_fake": false,
-  "confidence": 0.85,
-  "ensemble_mode": "3_models_active",
   "models": {
     "sbi": {
       "is_fake": false,
-      "confidence": 0.82,
+      "confidence": 0.42,
       "status": "active"
     },
     "distildire": {
       "is_fake": false,
-      "confidence": 0.88,
+      "confidence": 0.31,
       "status": "active"
     },
     "chatgpt": {
       "is_fake": false,
-      "confidence": 0.85,
+      "confidence": 0.12,
       "status": "active"
     }
   }

@@ -1,24 +1,56 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { detectDeepfake } from '../services/api'
+import LoadingStatus from './LoadingStatus'
 
 export default function ImageUploader({ onResult, loading, setLoading }) {
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState(null)
+  const [modelStatuses, setModelStatuses] = useState({
+    sbi: 'pending',
+    distildire: 'pending',
+    chatgpt: 'pending'
+  })
+
+  // Simulate model-by-model progress (since API returns all at once)
+  useEffect(() => {
+    if (loading) {
+      // Reset and start with SBI running
+      setModelStatuses({ sbi: 'running', distildire: 'pending', chatgpt: 'pending' })
+
+      // Simulate sequential progress
+      const timer1 = setTimeout(() => {
+        setModelStatuses(prev => ({ ...prev, sbi: 'done', distildire: 'running' }))
+      }, 800)
+
+      const timer2 = setTimeout(() => {
+        setModelStatuses(prev => ({ ...prev, distildire: 'done', chatgpt: 'running' }))
+      }, 1600)
+
+      return () => {
+        clearTimeout(timer1)
+        clearTimeout(timer2)
+      }
+    }
+  }, [loading])
 
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0]
     if (!file) return
 
     setError(null)
+    onResult(null) // Clear previous results
     setPreview(URL.createObjectURL(file))
     setLoading(true)
 
     try {
       const result = await detectDeepfake(file)
+      // Mark all as done when result arrives
+      setModelStatuses({ sbi: 'done', distildire: 'done', chatgpt: 'done' })
       onResult(result)
     } catch (err) {
       setError('Failed to analyze image. Please try again.')
+      setModelStatuses({ sbi: 'failed', distildire: 'failed', chatgpt: 'failed' })
       console.error(err)
     } finally {
       setLoading(false)
@@ -35,19 +67,20 @@ export default function ImageUploader({ onResult, loading, setLoading }) {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Dropzone */}
       <div
         {...getRootProps()}
-        className={`border-3 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all ${
+        className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
           isDragActive
-            ? 'border-black bg-gray-100'
-            : 'border-gray-300 hover:border-gray-500 hover:bg-gray-50'
+            ? 'border-gray-900 bg-gray-100'
+            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
         } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <input {...getInputProps()} />
-        <div className="space-y-4">
+        <div className="space-y-2">
           <svg
-            className="mx-auto h-16 w-16 text-gray-400"
+            className="mx-auto h-12 w-12 text-gray-400"
             stroke="currentColor"
             fill="none"
             viewBox="0 0 48 48"
@@ -61,40 +94,38 @@ export default function ImageUploader({ onResult, loading, setLoading }) {
             />
           </svg>
           {isDragActive ? (
-            <p className="text-lg text-black font-medium">Drop the image here</p>
+            <p className="text-base text-gray-900 font-medium">Drop the image here</p>
           ) : (
             <div>
-              <p className="text-lg text-gray-800 font-medium">
-                Drag and drop an image, or click to select
+              <p className="text-base text-gray-700 font-medium">
+                <span className="md:hidden">Tap to select an image</span>
+                <span className="hidden md:inline">Drag and drop an image, or click to select</span>
               </p>
-              <p className="text-sm text-gray-500 mt-2">
-                PNG, JPG, JPEG, WEBP up to 20MB
+              <p className="text-sm text-gray-500 mt-1">
+                PNG, JPG, JPEG, WEBP
               </p>
             </div>
           )}
         </div>
       </div>
 
+      {/* Image Preview */}
       {preview && (
         <div className="relative">
           <img
             src={preview}
             alt="Preview"
-            className="w-full max-h-96 object-contain rounded-lg shadow-md"
+            className="w-full max-h-80 md:max-h-96 object-contain rounded-xl border border-gray-200"
           />
-          {loading && (
-            <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-                <p className="text-white font-medium">Analyzing image...</p>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
+      {/* Loading Status */}
+      {loading && <LoadingStatus modelStatuses={modelStatuses} />}
+
+      {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        <div className="bg-fake-light border border-fake text-fake-dark px-4 py-3 rounded-xl text-sm">
           {error}
         </div>
       )}

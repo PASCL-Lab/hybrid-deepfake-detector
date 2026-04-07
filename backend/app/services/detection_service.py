@@ -96,42 +96,16 @@ class DetectionService:
             chatgpt_is_fake, chatgpt_confidence = False, 0.5
             chatgpt_status = "error"
 
-        # 4. Ensemble fusion strategy
-        # All confidence values represent deepfake_confidence (probability of being fake)
-        # Count how many models are active
-        active_models = sum([self.use_sbi, self.use_distildire, True])  # ChatGPT always active
-
-        if active_models == 3:
-            # All three models active - weighted ensemble
-            # SBI: 30% weight (fast screening)
-            # DistilDIRE: 35% weight (high accuracy)
-            # ChatGPT: 35% weight (VLM reasoning)
-            final_deepfake_confidence = (
-                0.30 * sbi_confidence +
-                0.35 * distildire_confidence +
-                0.35 * chatgpt_confidence
-            )
-        elif active_models == 2:
-            if self.use_sbi and self.use_distildire:
-                # SBI + DistilDIRE (no ChatGPT)
-                final_deepfake_confidence = 0.4 * sbi_confidence + 0.6 * distildire_confidence
-            elif self.use_sbi:
-                # SBI + ChatGPT (no DistilDIRE)
-                final_deepfake_confidence = 0.4 * sbi_confidence + 0.6 * chatgpt_confidence
-            else:
-                # DistilDIRE + ChatGPT (no SBI)
-                final_deepfake_confidence = 0.5 * distildire_confidence + 0.5 * chatgpt_confidence
-        else:
-            # Only ChatGPT active
-            final_deepfake_confidence = chatgpt_confidence
-
-        # Final decision: threshold at 0.5
-        is_fake = final_deepfake_confidence > 0.5
+        # Each model has its own optimal threshold (tuned per-model).
+        # Top-level is_fake is true if ANY active model exceeds its threshold.
+        is_fake = any([
+            sbi_status == "active" and sbi_confidence >= 0.4839,
+            distildire_status == "active" and distildire_confidence >= 0.5,
+            chatgpt_status == "active" and chatgpt_confidence >= 0.65,
+        ])
 
         return {
             "is_fake": is_fake,
-            "confidence": final_deepfake_confidence,  # Deepfake probability (0.0=real, 1.0=fake)
-            "ensemble_mode": f"{active_models}_models_active",
             "models": {
                 "sbi": {
                     "is_fake": sbi_is_fake,
