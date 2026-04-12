@@ -61,7 +61,6 @@ class SBIModel:
         self.transform = transforms.Compose([
             transforms.Resize((380, 380)),
             transforms.ToTensor(),
-            # Note: No additional normalization needed, model handles internally
         ])
 
         print(f"✓ SBI model loaded successfully on {self.device}")
@@ -91,8 +90,8 @@ class SBIModel:
                 # Get fake probability (class 1)
                 fake_prob = probs[0, 1].item()
 
-            # Threshold at 0.5
-            is_fake = fake_prob > 0.5
+            # Threshold at 0.4839 (optimal F1 threshold, consistent with detection_service.py)
+            is_fake = fake_prob >= 0.4839
 
             return is_fake, fake_prob
 

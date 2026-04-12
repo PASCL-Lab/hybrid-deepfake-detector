@@ -5,17 +5,16 @@ export default function VerdictCard({ result }) {
   const analysisLines = [];
 
   if (result.models) {
-    const { sbi, distildire, chatgpt } = result.models;
+    const { sbi, distildire } = result.models;
 
     if (sbi && sbi.status !== 'placeholder' && sbi.status !== 'error' && sbi.confidence >= THRESHOLD.sbi) {
-      analysisLines.push(`High likelihood of face-swap / reenactment (SBI: ${(sbi.confidence * 100).toFixed(0)}%)`);
+      analysisLines.push(`Face-swap / reenactment blending artifacts detected (SBI: ${(sbi.confidence * 100).toFixed(0)}%)`);
     }
     if (distildire && distildire.status !== 'placeholder' && distildire.status !== 'error' && distildire.confidence >= THRESHOLD.distildire) {
-      analysisLines.push(`High likelihood of diffusion AI-generated image (DistilDIRE: ${(distildire.confidence * 100).toFixed(0)}%)`);
+      analysisLines.push(`AI diffusion synthesis patterns detected (DistilDIRE: ${(distildire.confidence * 100).toFixed(0)}%)`);
     }
-    if (chatgpt && chatgpt.status !== 'placeholder' && chatgpt.status !== 'error' && chatgpt.confidence >= THRESHOLD.chatgpt) {
-      analysisLines.push(`AI manipulation / artifacts detected (GPT Vision: ${(chatgpt.confidence * 100).toFixed(0)}%)`);
-    }
+    // GPT Vision is intentionally excluded from the verdict summary —
+    // VLM outputs are shown separately as an experimental signal.
   }
 
   const isFake = analysisLines.length > 0;
@@ -31,7 +30,7 @@ export default function VerdictCard({ result }) {
         className="text-xl font-bold"
         style={{ color: isFake ? COLORS.fake.primary : COLORS.real.primary }}
       >
-        {isFake ? 'High Chance of Being Fake' : 'Likely Authentic'}
+        {isFake ? 'Potential Deepfake Artifacts Detected' : 'No Deepfake Artifacts Detected'}
       </h2>
 
       {isFake && analysisLines.length > 0 && (
@@ -50,7 +49,7 @@ export default function VerdictCard({ result }) {
 
       {!isFake && (
         <p className="text-sm text-gray-500 mt-2">
-          No strong evidence of manipulation detected
+          No artifacts or manipulation patterns were flagged by any model
         </p>
       )}
     </div>

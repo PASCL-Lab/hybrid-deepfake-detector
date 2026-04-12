@@ -29,6 +29,22 @@ backend/venv/
 backend/test_models_quick.py
 backend/app/models/test image/
 
+# LaTeX thesis files
+main.tex
+references.bib
+paper/
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
 # Claude Code files
 CLAUDE.md
 INTEGRATION_SUMMARY.md

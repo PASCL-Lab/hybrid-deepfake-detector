@@ -2,10 +2,13 @@ import { useCallback, useState, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { detectDeepfake } from '../services/api'
 import LoadingStatus from './LoadingStatus'
+import CropModal from './CropModal'
 
 export default function ImageUploader({ onResult, loading, setLoading }) {
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState(null)
+  const [cropSrc, setCropSrc] = useState(null)
+  const [cropFileName, setCropFileName] = useState('')
   const [modelStatuses, setModelStatuses] = useState({
     sbi: 'pending',
     distildire: 'pending',
@@ -15,10 +18,8 @@ export default function ImageUploader({ onResult, loading, setLoading }) {
   // Simulate model-by-model progress (since API returns all at once)
   useEffect(() => {
     if (loading) {
-      // Reset and start with SBI running
       setModelStatuses({ sbi: 'running', distildire: 'pending', chatgpt: 'pending' })
 
-      // Simulate sequential progress
       const timer1 = setTimeout(() => {
         setModelStatuses(prev => ({ ...prev, sbi: 'done', distildire: 'running' }))
       }, 800)
@@ -34,18 +35,14 @@ export default function ImageUploader({ onResult, loading, setLoading }) {
     }
   }, [loading])
 
-  const onDrop = useCallback(async (acceptedFiles) => {
-    const file = acceptedFiles[0]
-    if (!file) return
-
+  const runDetection = useCallback(async (file, previewUrl) => {
     setError(null)
-    onResult(null) // Clear previous results
-    setPreview(URL.createObjectURL(file))
+    onResult(null)
+    setPreview(previewUrl)
     setLoading(true)
 
     try {
       const result = await detectDeepfake(file)
-      // Mark all as done when result arrives
       setModelStatuses({ sbi: 'done', distildire: 'done', chatgpt: 'done' })
       onResult(result)
     } catch (err) {
@@ -56,6 +53,23 @@ export default function ImageUploader({ onResult, loading, setLoading }) {
       setLoading(false)
     }
   }, [onResult, setLoading])
+
+  const onDrop = useCallback((acceptedFiles) => {
+    const file = acceptedFiles[0]
+    if (!file) return
+    // Show crop modal instead of uploading immediately
+    setCropSrc(URL.createObjectURL(file))
+    setCropFileName(file.name)
+  }, [])
+
+  const handleCropConfirm = useCallback((croppedFile, croppedPreviewUrl) => {
+    setCropSrc(null)
+    runDetection(croppedFile, croppedPreviewUrl)
+  }, [runDetection])
+
+  const handleCropCancel = useCallback(() => {
+    setCropSrc(null)
+  }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -68,6 +82,16 @@ export default function ImageUploader({ onResult, loading, setLoading }) {
 
   return (
     <div className="space-y-4">
+      {/* Crop Modal */}
+      {cropSrc && (
+        <CropModal
+          imageSrc={cropSrc}
+          fileName={cropFileName}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
+
       {/* Dropzone */}
       <div
         {...getRootProps()}

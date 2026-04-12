@@ -16,9 +16,6 @@ function App() {
           <h1 className="text-2xl font-bold text-gray-900">
             Deepfake Detector
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            SBI + DistilDIRE (Local) + GPT Vision (Cloud)
-          </p>
         </header>
 
         {/* Main Content Card */}

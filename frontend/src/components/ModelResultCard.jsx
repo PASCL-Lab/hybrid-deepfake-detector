@@ -68,16 +68,18 @@ export default function ModelResultCard({ modelKey, modelResult }) {
       {!isPlaceholder && !isError && (
         <div className="mt-4">
           <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-gray-500">Fake Confidence</span>
+            <span className="text-gray-500">
+              {isFake ? 'Fake Confidence' : 'Real Confidence'}
+            </span>
             <span className="font-semibold" style={{ color: progressColor }}>
-              {confidencePercent.toFixed(1)}%
+              {isFake ? confidencePercent.toFixed(1) : (100 - confidencePercent).toFixed(1)}%
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
             <div
               className="h-2 rounded-full transition-all duration-500"
               style={{
-                width: `${confidencePercent}%`,
+                width: `${isFake ? confidencePercent : 100 - confidencePercent}%`,
                 backgroundColor: progressColor
               }}
             />
