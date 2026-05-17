@@ -1,123 +1,76 @@
-# Hybrid Deepfake Detection System
+# Hybrid Deepfake Detector
 
-A web-based deepfake detection system that contrasts two lightweight specialized detectors against GPT-5.4 Vision — examining whether an API-accessible Vision-Language Model is a reliable alternative for everyday users.
+> A web-based ensemble that contrasts two specialized vision detectors with a Vision-Language Model for accessible, real-world deepfake detection.
 
-Two categories of real-world deepfakes are targeted:
-- **Face-swap & reenactment** → SBI (Self-Blended Images)
-- **AI-synthesized / diffusion-generated** → DistilDIRE v2
+## Overview
 
-GPT-5.4 Vision is included as a **comparative reference** using zero-shot prompting, not as part of the detection verdict.
+The Hybrid Deepfake Detector is a research artifact that benchmarks two lightweight, task-specialized deepfake detectors against an API-accessible Vision-Language Model (VLM) to investigate whether everyday users can rely on commercial VLMs for credible deepfake screening. The system orchestrates three independent detectors — Self-Blended Images (SBI) for face-swap and reenactment artifacts, DistilDIRE v2 for AI-synthesized / diffusion-generated images, and a zero-shot GPT Vision reference — and exposes them through a FastAPI service with a React + Vite frontend. Each specialized model emits an independent verdict; the VLM is included as a comparative baseline rather than as part of the final decision. The repository ships the model loaders, the inference orchestration, a Dockerized backend, the React UI with cropping and side-by-side comparison, and deployment scripts.
 
-## Live Demo
+## Research Context
 
-Try it directly on Hugging Face Spaces — no setup required:
+The system implements the evaluation methodology proposed in Pirogov & Artemev, *Visual Language Models as Zero-Shot Deepfake Detectors* (ICML 2025), using first-token logprob normalization (`P̃_fake = P(NO) / (P(NO) + P(YES))`) to derive calibrated VLM scores, and integrates established specialized detectors from Shiohara & Yamasaki (SBI, CVPR 2022) and Lim et al. (DistilDIRE, 2024).
 
-**[Launch Demo](https://huggingface.co/spaces/ahasirly/Accessible-Deepfake-Detection-Hybrid-Apporach)**
+## Features
 
-## Project Status
-
-### Implemented
-- **Frontend**: React + Vite + Tailwind CSS — side-by-side VS layout (VLM vs Specialized Models)
-- **Backend API**: FastAPI with `/api/v1/detect` endpoint
-- **SBI Model**: EfficientNet-B4 fine-tuned on FFHQ + LFW + CelebA-HQ (AUC 98.73%)
-- **DistilDIRE v2**: ConvNeXt-base with CLIP-LAION2B pretraining (AP 96.11%)
-- **GPT-5.4 Vision**: Zero-shot comparative reference using Pirogov's logprobs normalization (ICML 2025)
-- **Image Cropping**: Built-in crop tool before analysis
-- **Independent Model Verdicts**: Each model targets a different manipulation type; no ensemble averaging
-- **Docker Deployment**: Full containerized deployment with docker-compose
-
-### Model Weights
-Models run in "placeholder" mode if weight files are not present. Download model weights to enable full functionality:
-- SBI: `backend/ml_models/deployment_package/models/sbi/`
-- DistilDIRE: `backend/ml_models/deployment_package/models/distildire/`
+- Independent specialized verdicts for face-swap (SBI) and AI-synthesized imagery (DistilDIRE v2)
+- Zero-shot GPT Vision baseline using log-probability normalization for calibrated confidence
+- Drag-and-drop upload with automatic compression for files over 5 MB
+- Built-in cropping modal for region-of-interest analysis prior to inference
+- Side-by-side VS layout comparing the VLM reference against specialized detectors
+- Containerized deployment via Docker Compose with health checks for both services
 
 ## Architecture
 
-```
-├── backend/                     # FastAPI Backend
-│   ├── app/
-│   │   ├── api/v1/endpoints/   # Detection endpoint
-│   │   ├── models/             # ML Model Loaders
-│   │   │   ├── sbi_model.py
-│   │   │   ├── distildire_model.py
-│   │   │   └── chatgpt_vision.py
-│   │   ├── services/           # Detection orchestration
-│   │   ├── ml_inference/       # Model architectures
-│   │   │   ├── sbi/           # SBI detector architecture
-│   │   │   └── improved_model.py  # DistilDIRE v2
-│   │   └── core/               # Configuration
-│   ├── ml_models/              # Model weight files
-│   │   └── deployment_package/models/
-│   │       ├── sbi/           # SBI weights
-│   │       └── distildire/    # DistilDIRE weights
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env
-├── frontend/                   # React Frontend
-│   ├── src/
-│   │   ├── components/        # ImageUploader, CropModal, ResultDisplay, etc.
-│   │   ├── services/          # API client
-│   │   └── App.jsx
-│   ├── package.json
-│   ├── Dockerfile
-│   └── vite.config.js
-└── docker-compose.yml
-```
+The detection backend exposes a single `/api/v1/detect` endpoint that fans an uploaded image out to three independent models:
 
-## Models
+- **SBI** — EfficientNet-B4 fine-tuned on FFHQ + LFW + CelebA-HQ self-blended pairs, 380x380 input, decision threshold 0.4839 (reported AUC 98.73%, accuracy 94.83%).
+- **DistilDIRE v2** — ConvNeXt-base initialized from CLIP-LAION2B weights for diffusion-image discrimination, 224x224 input, threshold 0.50 (reported accuracy 86.89%, AP 96.11%).
+- **GPT Vision** — OpenAI Vision API queried with a zero-shot prompt; the fake probability is reconstructed from first-token logprobs and shown for reference only.
 
-| Model | Architecture | Input | Performance | Target |
-|-------|-------------|-------|-------------|--------|
-| **SBI** | EfficientNet-B4 | 380×380 | AUC 98.73%, Acc 94.83% | Face-swap & reenactment |
-| **DistilDIRE v2** | ConvNeXt-base + CLIP | 224×224 | Acc 86.89%, AP 96.11% | AI-synthesized / diffusion images |
-| **GPT-5.4 Vision** | VLM (API) | Auto-compressed | Comparative reference | Zero-shot general reasoning |
+An image is flagged as fake if **any** specialized model exceeds its threshold; ensemble averaging is intentionally avoided because each detector targets a different manipulation family. Models auto-detect CUDA and fall back to a "placeholder" mode when weights are absent so the API surface remains testable without the full deployment bundle.
 
-### Detection Strategy
+## Tech Stack
 
-Each specialized model runs independently. The image is flagged as fake if **any** specialized model exceeds its threshold:
+- **Backend:** Python 3.11+, FastAPI, PyTorch, timm, EfficientNet-PyTorch, OpenAI SDK
+- **Frontend:** React 19, Vite 7, Tailwind CSS 3, Axios, react-dropzone, react-easy-crop
+- **Deployment:** Docker, Docker Compose, Nginx (frontend), Uvicorn (backend)
 
-- **SBI**: threshold 0.4839 (optimized for face-swap detection)
-- **DistilDIRE**: threshold 0.50 (optimized for AI-generated image detection)
-- **GPT-5.4 Vision**: threshold 0.65 — shown for comparison only, not used for the verdict
+## Getting Started
 
-GPT confidence is derived from first-token logprobs normalization (Pirogov, ICML 2025):
-```
-P̃_fake = P(NO) / (P(NO) + P(YES))
-```
+### Prerequisites
 
-## Setup
+- Python 3.11+
+- Node.js 16+
+- Docker and Docker Compose (for the containerized path)
+- An OpenAI API key with Vision access
+- (Optional) CUDA-capable GPU for sub-200 ms inference
 
-### Quick Start
+### Installation
 
 ```bash
-# Set your OpenAI API key
+git clone https://github.com/PASCL-Lab/hybrid-deepfake-detector.git
+cd hybrid-deepfake-detector
 echo "OPENAI_API_KEY=your_key_here" > backend/.env
-
-# Start both services
-./start.sh
 ```
 
-### Docker
+Model weights are distributed separately; extract `deployment_package.tar.gz` into `backend/ml_models/` so that the `sbi/` and `distildire/` directories sit under `backend/ml_models/deployment_package/models/`.
+
+### Running
+
+#### Inference / API (Docker)
 
 ```bash
-echo "OPENAI_API_KEY=your_key_here" > backend/.env
 docker-compose up -d --build
 ```
 
-Access:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+The frontend is then available on `http://localhost:3000`, the API on `http://localhost:8000`, and interactive docs on `http://localhost:8000/docs`.
 
-### Manual Setup
-
-**Prerequisites:** Python 3.11+, Node.js 16+, OpenAI API Key
+#### Inference / API (manual)
 
 ```bash
 # Backend
 cd backend
 pip install -r requirements.txt
-cp .env.example .env  # Add your OPENAI_API_KEY
 uvicorn app.main:app --reload --port 8000
 
 # Frontend (new terminal)
@@ -126,75 +79,39 @@ npm install
 npm run dev
 ```
 
-## Usage
+#### Quick start script
 
-1. Open http://localhost:3000
-2. Drag and drop an image or click to upload
-3. Crop the image if needed, then confirm
-4. View results — specialized model verdicts on the right, GPT comparison on the left
-
-## Features
-
-- **Drag & Drop Upload**: With automatic compression for images over 5MB
-- **Image Cropping**: Crop before analysis using the built-in crop modal
-- **VS Layout**: Side-by-side comparison of VLM output vs specialized detector output
-- **Independent Verdicts**: SBI and DistilDIRE each give separate verdicts targeting different deepfake types
-- **Confidence Scores**: Per-model confidence with clear interpretation (0.0 = real, 1.0 = fake)
-
-## API
-
-**POST** `/api/v1/detect` — accepts multipart/form-data with image file (PNG, JPG, JPEG, WEBP, max 20MB)
-
-**Response:**
-```json
-{
-  "is_fake": false,
-  "models": {
-    "sbi": { "is_fake": false, "confidence": 0.42, "status": "active" },
-    "distildire": { "is_fake": false, "confidence": 0.31, "status": "active" },
-    "chatgpt": { "is_fake": false, "confidence": 0.12, "status": "active" }
-  }
-}
+```bash
+./start.sh   # launches backend + frontend with logs in /tmp
+./stop.sh    # stops both processes
 ```
 
-Status values: `active`, `placeholder`, `error`
+## Project Structure
 
-## Tech Stack
+```
+backend/
+  app/
+    api/v1/endpoints/    # /api/v1/detect FastAPI route
+    models/              # SBI, DistilDIRE, ChatGPT Vision loaders
+    services/            # Detection orchestration
+    ml_inference/        # SBI architecture and DistilDIRE v2 model
+    core/                # Settings / configuration
+  ml_models/             # Model weight directory (gitignored)
+  Dockerfile
+frontend/
+  src/
+    components/          # ImageUploader, CropModal, ResultDisplay
+    services/            # API client
+  Dockerfile
+  nginx.conf
+docker-compose.yml
+start.sh / stop.sh
+```
 
-**Frontend:** React 19, Vite 7, Tailwind CSS 3, Axios, react-dropzone, react-easy-crop
+## License
 
-**Backend:** FastAPI, PyTorch, OpenAI SDK, EfficientNet-PyTorch, timm + huggingface-hub
+This project is the intellectual property of **PASCL Lab**. All rights reserved.
 
-**Deployment:** Docker + Docker Compose
+Unauthorized copying, distribution, modification, or use of this codebase, in whole or in part, is strictly prohibited without prior written permission from PASCL Lab.
 
-## GPU Support
-
-Models auto-detect CUDA availability. CPU inference works but is slower (~1–2s per model). GPU reduces this to under 200ms.
-
-## Model Weights
-
-Download: [Google Drive](https://drive.google.com/file/d/17pou72RyAecPwZWBgw9syrDiP1C0dyXH/view?usp=sharing)
-
-Extract `deployment_package.tar.gz` to `backend/ml_models/`
-
-## Credits
-
-### Datasets
-- [Swappir Dataset](https://huggingface.co/datasets/Sumsub/Swappir) — LFW, CelebA-HQ, FairFace
-- [FFHQ](https://github.com/NVlabs/ffhq-dataset)
-- [Deepfake-Eval-2024](https://huggingface.co/datasets/nuriachandra/Deepfake-Eval-2024)
-- [SimSwap](https://github.com/neuralchen/SimSwap)
-
-### Code & Models
-- [SBI](https://github.com/mapooon/SelfBlendedImages) — Shiohara & Yamasaki, CVPR 2022
-- [DistilDIRE](https://arxiv.org/abs/2406.00856) — Lim et al., 2024
-- [EfficientNet-PyTorch](https://github.com/lukemelas/EfficientNet-PyTorch)
-- [ConvNeXt](https://github.com/facebookresearch/ConvNeXt)
-- [timm](https://github.com/huggingface/pytorch-image-models)
-- [OpenAI API](https://platform.openai.com/)
-
-### References
-- Pirogov & Artemev, *Visual Language Models as Zero-Shot Deepfake Detectors*, ICML 2025
-- Pirogov & Artemev, *Evaluating Deepfake Detectors in the Wild*, 2025
-- Castaneda et al., *Revisiting Simple Baselines for In-The-Wild Deepfake Detection*, 2025
-- Chandra et al., *Deepfake-Eval-2024*, 2025
+(c) 2026 PASCL Lab. All rights reserved.
